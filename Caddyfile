@@ -16,7 +16,6 @@
     }
 
     handle {
-        templates
         root * /app/frontend
         file_server
     }
