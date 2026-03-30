@@ -1,0 +1,109 @@
+{
+  "version": "1.0",
+  "components": [
+    {
+      "type": "Network",
+      "name": "spawned-vpc",
+      "values": {
+        "id": "spawned-vpc-network",
+        "name": "spawned-vpc",
+        "provider": "aws",
+        "is_data_source": true,
+        "cidr_block": "10.0.0.0/16",
+        "subnets": [
+          {"_type": "Subnet", "id": "spawned-vpc_subnet_0-subnet", "name": "spawned-vpc_subnet_0", "provider": "aws", "is_data_source": false, "cidr": "10.0.0.0/24", "zone": "eu-central-1a", "network_name": "spawned-vpc", "public": true},
+          {"_type": "Subnet", "id": "spawned-vpc_subnet_1-subnet", "name": "spawned-vpc_subnet_1", "provider": "aws", "is_data_source": false, "cidr": "10.0.1.0/24", "zone": "eu-central-1b", "network_name": "spawned-vpc", "public": true},
+          {"_type": "Subnet", "id": "spawned-vpc_subnet_2-subnet", "name": "spawned-vpc_subnet_2", "provider": "aws", "is_data_source": false, "cidr": "10.0.2.0/24", "zone": "eu-central-1a", "network_name": "spawned-vpc", "public": false},
+          {"_type": "Subnet", "id": "spawned-vpc_subnet_3-subnet", "name": "spawned-vpc_subnet_3", "provider": "aws", "is_data_source": false, "cidr": "10.0.3.0/24", "zone": "eu-central-1b", "network_name": "spawned-vpc", "public": false}
+        ],
+        "nat_gateway_enabled": true,
+        "vpn_enabled": false,
+        "dns_support": true
+      }
+    },
+    {
+      "type": "LoadBalancer",
+      "name": "spawned-lb",
+      "values": {
+        "id": "spawned-lb-loadbalancer",
+        "name": "spawned-lb",
+        "provider": "aws",
+        "is_data_source": true,
+        "network": {"$ref": "spawned-vpc"},
+        "public": true,
+        "enable_https": true,
+        "redirect_http_to_https": true,
+        "health_check_path": "/"
+      }
+    },
+    {
+      "type": "Database",
+      "name": "todo-db",
+      "values": {
+        "id": "todo-db-database",
+        "name": "todo-db",
+        "provider": "aws",
+        "engine": "postgres",
+        "version": "16",
+        "network": {"$ref": "spawned-vpc"},
+        "public": false,
+        "size": "small",
+        "storage_gb": 20,
+        "high_availability": false,
+        "backup_retention_days": 7,
+        "encryption": true,
+        "port": 5432
+      }
+    },
+    {
+      "type": "Secret",
+      "name": "todo-db-url",
+      "values": {
+        "id": "todo-db-url-secret",
+        "name": "todo-db-url",
+        "provider": "aws",
+        "key": "todo-db-url",
+        "template": "postgresql://{username}:{password}@{endpoint}/{database}",
+        "sources": {
+          "username": {"$ref": "todo-db", "$get": "username"},
+          "password": {"$ref": "todo-db", "$get": "password"},
+          "endpoint": {"$ref": "todo-db", "$get": "endpoint"},
+          "database": {"$ref": "todo-db", "$get": "db_name"}
+        }
+      }
+    },
+    {
+      "type": "Container",
+      "name": "todo-app",
+      "values": {
+        "id": "todo-app-container",
+        "name": "todo-app",
+        "provider": "aws",
+        "image": null,
+        "source": {
+          "type": "git",
+          "url": "https://github.com/ludsil/todo",
+          "build_path": "."
+        },
+        "network": {"$ref": "spawned-vpc"},
+        "public": false,
+        "cpu": "512",
+        "memory": "1024",
+        "ports": [8080],
+        "load_balancer": {"$ref": "spawned-lb"},
+        "domain": "todo.dev.askrike.app",
+        "health_check": {
+          "path": "/health",
+          "interval": 30,
+          "timeout": 10
+        },
+        "environment_secrets": {
+          "DATABASE_URL": {"$ref": "todo-db-url"}
+        },
+        "connections": [
+          {"$ref": "todo-db", "$connection": true}
+        ]
+      }
+    }
+  ]
+}
