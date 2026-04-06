@@ -38,10 +38,10 @@
     },
     {
       "type": "Database",
-      "name": "todo-db",
+      "name": "test-todo-db",
       "values": {
-        "id": "todo-db-database",
-        "name": "todo-db",
+        "id": "test-todo-db-database",
+        "name": "test-todo-db",
         "provider": "aws",
         "engine": "postgres",
         "version": "16",
@@ -57,51 +57,52 @@
     },
     {
       "type": "Secret",
-      "name": "todo-db-url",
+      "name": "test-todo-db-url",
       "values": {
-        "id": "todo-db-url-secret",
-        "name": "todo-db-url",
+        "id": "test-todo-db-url-secret",
+        "name": "test-todo-db-url",
         "provider": "aws",
-        "key": "todo-db-url",
+        "key": "test-todo-db-url",
         "template": "postgresql://{username}:{password}@{endpoint}/{database}",
         "sources": {
-          "username": {"$ref": "todo-db", "$get": "username"},
-          "password": {"$ref": "todo-db", "$get": "password"},
-          "endpoint": {"$ref": "todo-db", "$get": "endpoint"},
-          "database": {"$ref": "todo-db", "$get": "db_name"}
+          "username": {"$ref": "test-todo-db", "$get": "username"},
+          "password": {"$ref": "test-todo-db", "$get": "password"},
+          "endpoint": {"$ref": "test-todo-db", "$get": "endpoint"},
+          "database": {"$ref": "test-todo-db", "$get": "db_name"}
         }
       }
     },
     {
       "type": "Container",
-      "name": "todo-app",
+      "name": "test-todo-api",
       "values": {
-        "id": "todo-app-container",
-        "name": "todo-app",
+        "id": "test-todo-api-container",
+        "name": "test-todo-api",
         "provider": "aws",
         "image": null,
         "source": {
           "type": "git",
           "url": "https://github.com/ludsil/todo",
-          "build_path": "."
+          "build_path": "backend"
         },
+        "build": {},
         "network": {"$ref": "spawned-vpc"},
         "public": false,
         "cpu": "512",
         "memory": "1024",
         "ports": [8000],
         "load_balancer": {"$ref": "spawned-lb"},
-        "domain": "fresh-todo.dev.askrike.app",
+        "domain": "test-todo.dev.askrike.app",
         "health_check": {
           "path": "/health",
           "interval": 30,
           "timeout": 10
         },
         "environment_secrets": {
-          "DATABASE_URL": {"$ref": "todo-db-url"}
+          "DATABASE_URL": {"$ref": "test-todo-db-url"}
         },
         "connections": [
-          {"$ref": "todo-db", "$connection": true}
+          {"$ref": "test-todo-db", "$connection": true}
         ]
       }
     }
