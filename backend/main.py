@@ -11,7 +11,19 @@ from typing import List, Optional
 from datetime import datetime
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./todos.db")
+def _resolve_database_url() -> str:
+    if url := os.getenv("DATABASE_URL"):
+        return url
+    if host := os.getenv("TODO_DB_HOST"):
+        user = os.getenv("TODO_DB_USER", "appuser")
+        password = os.getenv("TODO_DB_PASSWORD", "")
+        port = os.getenv("TODO_DB_PORT", "5432")
+        name = os.getenv("TODO_DB_NAME", "app")
+        return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+    return "sqlite:///./todos.db"
+
+
+DATABASE_URL = _resolve_database_url()
 
 # In dev we use sqlite
 if DATABASE_URL.startswith("sqlite"):
