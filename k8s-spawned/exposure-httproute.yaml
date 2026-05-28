@@ -1,0 +1,31 @@
+# NOT spawned-generated. Spawned's demo-cluster registration assumes an nginx
+# ingress controller and emits no ingress for this minimal spec; the reb AKS
+# cluster instead fronts traffic with the Gateway API / Azure ALB. This route
+# bridges that gap so the spawned-rendered Service is publicly reachable,
+# mirroring the exposure used by the hand-written manual deploy. It attaches to
+# the shared argocd/argocd Gateway (wildcard *.reb.anforsm.com, routes from all
+# namespaces) and targets spawned's Service (todo-api:8000).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: todo-spawned
+  namespace: askrike-ai-v8gfssky
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: argocd
+      namespace: argocd
+  hostnames:
+    - todo-spawned.reb.anforsm.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: todo-api
+          port: 8000
+          weight: 1
