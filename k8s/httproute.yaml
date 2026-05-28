@@ -1,0 +1,29 @@
+# Attaches to the shared cluster Gateway (argocd/argocd), which has a wildcard
+# *.reb.anforsm.com HTTPS listener and accepts routes from all namespaces.
+# - cert-manager already serves the wildcard TLS cert on that listener.
+# - external-dns (gateway-httproute source) reads this hostname and writes the
+#   CNAME to the Application Gateway for Containers frontend in Azure DNS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: todo
+  namespace: todo
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: argocd
+      namespace: argocd
+  hostnames:
+    - todo.reb.anforsm.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: todo
+          port: 80
+          weight: 1
