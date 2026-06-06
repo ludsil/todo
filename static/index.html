@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTO Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; }
+  body {
+    background: #000;
+    overflow: hidden;
+    height: 100vh;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; opacity: 0.7; }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 80px;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    white-space: nowrap;
+  }
+  .title-row img {
+    height: 86px;
+    width: auto;
+  }
+  .title-dash {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 86px;
+    color: #fff;
+  }
+  .title-cto {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 86px;
+    color: #fff;
+    letter-spacing: 0.01em;
+  }
+  .cards {
+    display: flex;
+    gap: 60px;
+    pointer-events: none;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  .card-box {
+    width: 180px;
+    height: 180px;
+    border-radius: 12px;
+    background: #1c1c1c;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  .card-box img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .card-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .credit-code {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+  }
+  .credit-amount {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 32px;
+    font-weight: 400;
+    color: #fff;
+  }
+  .credit-code-text {
+    font-family: Menlo, Monaco, monospace;
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div class="title-row">
+    <img src="logo.svg" alt="Spawned">
+    <span class="title-dash">-</span>
+    <span class="title-cto">CTO Night</span>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-box"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=ffffff&bgcolor=1c1c1c&data=https%3A%2F%2Fdiscord.com%2Finvite%2FcdcZaYv94C" alt="Discord QR"></div>
+      <span class="card-label">Discord</span>
+    </div>
+    <div class="card">
+      <div class="card-box"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=ffffff&bgcolor=1c1c1c&data=https%3A%2F%2Fwww.linkedin.com%2Fcompany%2Fspawnedai%2F" alt="LinkedIn QR"></div>
+      <span class="card-label">LinkedIn</span>
+    </div>
+    <div class="card">
+      <div class="card-box credit-code">
+        <span class="credit-amount">$20</span>
+        <span class="credit-code-text">YHD70ZXI</span>
+      </div>
+      <span class="card-label">Cloud Credits</span>
+    </div>
+  </div>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+
+const chars = ' .·:;+*%#@';
+const fontSize = 10;
+const font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`;
+const charW = fontSize * 0.6;
+const charH = fontSize * 1.15;
+
+// Accent colors: warm sand, soft mauve, sky blue
+const accents = [
+  [218, 170, 146], // #daaa92
+  [213, 196, 213], // #d5c4d5
+  [145, 195, 217], // #91c3d9
+];
+
+// Pre-compute color LUT (256 entries)
+// Dark = near black, mid = white/gray, bright = accent tinted
+const colorLUT = new Array(256);
+for (let i = 0; i < 256; i++) {
+  const t = i / 255;
+  const gray = Math.round(t * 255);
+  // Blend accent color in for brighter values
+  const accentMix = Math.pow(t, 0.6) * 0.55;
+  // Each third of the range gets a different accent
+  const aIdx = Math.min((i * 3 / 256) | 0, 2);
+  const a = accents[aIdx];
+  const R = Math.round(gray * (1 - accentMix) + a[0] * accentMix);
+  const G = Math.round(gray * (1 - accentMix) + a[1] * accentMix);
+  const B = Math.round(gray * (1 - accentMix) + a[2] * accentMix);
+  colorLUT[i] = `rgb(${R},${G},${B})`;
+}
+
+// Permutation table for noise
+const perm = new Uint8Array(512);
+const p = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,
+  142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+  35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,
+  139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,
+  245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,
+  196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,
+  5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,
+  183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,39,
+  253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,193,
+  238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,
+  199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,
+  67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+
+function grad(hash, x, y, z) {
+  const h = hash & 15;
+  const u = h < 8 ? x : y;
+  const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+  return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+}
+
+function noise(x, y, z) {
+  const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+  x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+  const u = x * x * x * (x * (x * 6 - 15) + 10);
+  const v = y * y * y * (y * (y * 6 - 15) + 10);
+  const w = z * z * z * (z * (z * 6 - 15) + 10);
+  const A = perm[X] + Y, AA = perm[A] + Z, AB = perm[A + 1] + Z;
+  const B = perm[X + 1] + Y, BA = perm[B] + Z, BB = perm[B + 1] + Z;
+  return lerp(w,
+    lerp(v,
+      lerp(u, grad(perm[AA], x, y, z), grad(perm[BA], x-1, y, z)),
+      lerp(u, grad(perm[AB], x, y-1, z), grad(perm[BB], x-1, y-1, z))),
+    lerp(v,
+      lerp(u, grad(perm[AA+1], x, y, z-1), grad(perm[BA+1], x-1, y, z-1)),
+      lerp(u, grad(perm[AB+1], x, y-1, z-1), grad(perm[BB+1], x-1, y-1, z-1))));
+}
+
+function lerp(t, a, b) { return a + t * (b - a); }
+
+// 2-octave fbm instead of 4
+function fbm2(x, y, z) {
+  return noise(x, y, z) * 0.65 + noise(x * 2, y * 2, z * 2) * 0.35;
+}
+
+let cols, rows;
+// Coarse noise grid (compute noise at 1/4 resolution, bilinear interpolate)
+let noiseGrid;
+const STEP = 4; // compute every 4th cell
+
+function resize() {
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cols = Math.ceil(window.innerWidth / charW);
+  rows = Math.ceil(window.innerHeight / charH);
+  const gc = Math.ceil(cols / STEP) + 2;
+  const gr = Math.ceil(rows / STEP) + 2;
+  noiseGrid = new Float32Array(gc * gr);
+}
+window.addEventListener('resize', resize);
+resize();
+
+let mx = -9999, my = -9999;
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+function render(t) {
+  requestAnimationFrame(render);
+  t *= 0.001;
+
+  const w = canvas.width / dpr, h = canvas.height / dpr;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+  ctx.font = font;
+  ctx.textBaseline = 'top';
+
+  const gcols = Math.ceil(cols / STEP) + 2;
+  const grows = Math.ceil(rows / STEP) + 2;
+
+  // Fill coarse grid
+  for (let gr = 0; gr < grows; gr++) {
+    for (let gc = 0; gc < gcols; gc++) {
+      const nx = (gc * STEP) / cols;
+      const ny = (gr * STEP) / rows;
+      const n1 = fbm2(nx * 3 + t * 0.15, ny * 3 + t * 0.1, t * 0.08);
+      const warp = fbm2(nx * 2 + n1 * 1.5, ny * 2 + n1 * 1.2, t * 0.06 + 5);
+      noiseGrid[gr * gcols + gc] = warp;
+    }
+  }
+
+  // Bilinear interpolation helper
+  function sampleGrid(col, row) {
+    const gx = col / STEP, gy = row / STEP;
+    const ix = Math.floor(gx), iy = Math.floor(gy);
+    const fx = gx - ix, fy = gy - iy;
+    const i00 = iy * gcols + ix;
+    const a = noiseGrid[i00];
+    const b = noiseGrid[i00 + 1];
+    const c = noiseGrid[i00 + gcols];
+    const d = noiseGrid[i00 + gcols + 1];
+    return (a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy);
+  }
+
+  // Batch characters by color to reduce fillStyle switches
+  const buckets = new Map();
+
+  for (let row = 0; row < rows; row++) {
+    const y = row * charH;
+    const ny = row / rows;
+    for (let col = 0; col < cols; col++) {
+      const x = col * charW;
+      const nx = col / cols;
+
+      let val = (sampleGrid(col, row) + 1) * 0.5;
+
+      // Radial wave (cheap)
+      const cx = nx - 0.5, cy = ny - 0.5;
+      val += Math.sin(Math.sqrt(cx * cx + cy * cy) * 12 - t * 1.5) * 0.15;
+
+      // Mouse glow
+      if (mx > -999) {
+        const dx = x - mx, dy = y - my;
+        const md = dx * dx + dy * dy;
+        if (md < 62500) { // 250^2
+          val += (1 - Math.sqrt(md) / 250) * 0.5;
+        }
+      }
+
+      if (val < 0) val = 0; else if (val > 1) val = 1;
+
+      const ci = (val * (chars.length - 1)) | 0;
+      if (ci === 0) continue;
+
+      const colorIdx = (val * 255) | 0;
+      const key = colorIdx;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(chars[ci], x, y);
+    }
+  }
+
+  // Draw batched by color
+  for (const [colorIdx, items] of buckets) {
+    ctx.fillStyle = colorLUT[colorIdx];
+    for (let i = 0; i < items.length; i += 3) {
+      ctx.fillText(items[i], items[i + 1], items[i + 2]);
+    }
+  }
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
